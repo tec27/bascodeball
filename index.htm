@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Bascodeball - NCAA Tournament Bracket Generation</title>
+	<link href='http://fonts.googleapis.com/css?family=Droid+Sans' rel='stylesheet' type='text/css'>
+	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+	<script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.3.1/underscore-min.js"></script>
+	<script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/flot/0.7/jquery.flot.min.js"></script>
+	<script type="text/javascript">var switchTo5x=true;</script>
+	<script type="text/javascript" src="http://w.sharethis.com/button/buttons.js"></script>
+	<script type="text/javascript">stLight.options({publisher: "ur-afc2a78-2691-d8eb-3991-c321816d980e"}); </script>
+	<script type="text/javascript" src="bascodeball.js"></script>
+	<script type="text/javascript">
+		var teams, bracket;
+		$(function() {
+			"use strict";
+			teams = $.parseJSON($('#teams-json').val());
+			_.each(teams, function(val, key) {
+				teams[key] = _.map(val,function(team) {
+					return new BBall.Team(team.name, team.sagarin, team.seed, key);
+				});
+			});
+
+			bracket = BBall.buildFullTourneyBracket(teams);
+			function getNewBracket() {
+				var rounds = bracket.getOutcome().getRoundArrays();
+				$('#bracket').buildBracket(rounds);
+			}
+
+			function generateCharts() {
+				var n = 100000;
+				
+				var charts = [
+					{ div: $('#champ-chart'), func: simulateChampions },
+					{ div: $('#finalfour-chart'), func: simulateFinalFours },
+					{ div: $('#topeight-chart'), func: simulateTopEight },
+					{ div: $('#upset-chart'), func: simulateUpsets },
+					{ div: $('#upsetby-chart'), func: simulateUpsetsBy }
+				];
+				_.each(charts, function(chart) {
+					chart.data = {};
+				});
+				
+				var i = 0, progress = $('#chart-progress').text('').css('display', 'block');
+				_.defer(function deferredGenerator() {
+					progress.text('Simulation ' + i + ' / ' + n);
+					runSimulation(100, function(out) {
+						_.each(charts, function(chart) {
+							chart.func.call(this, chart.data, out);
+						});
+						i++;
+					});
+					if(i < n) _.defer(deferredGenerator);
+					else render();
+				});
+				
+				function render() {
+					progress.text('Rendering...');
+
+					_.each(charts, function(chart) {
+						var sortedData = _.sortBy(chart.data, function(val) { return val.times; }).reverse();
+						outputBarForTeams(chart.div, sortedData, n);
+					});
+
+					progress.css('display', 'none');
+				}
+			}
+
+			$('#gen-new-bracket').on('click', function(e) {
+				setTimeout(getNewBracket, 15);
+				e.preventDefault();
+			});
+
+			$('#gen-charts').on('click', function(e) {
+				setTimeout(generateCharts, 15);
+				e.preventDefault();
+			});
+
+			getNewBracket();
+		});
+
+		(function($, BBall) {
+			"use strict";
+			var roundNames = [ "first", "second", "third", "fourth", "fifth", "sixth", "seventh" ];
+			$.fn.buildBracket = function(rounds) {
+				var html = '';
+				_.each(rounds, function(r, roundNum) {
+					html += '<div class="round ' + roundNames[roundNum] + '">';
+					_.each(r, function(o, i, l) {
+						if(i%2 === 0) html += '<div class="matchup">';
+						html += '<div class="team ' + o.winner.quadrant + '"';
+						html += ' title="' + _.escape(o.toString()) + '">' + _.escape(o.toString()) + '</div>';
+						if(i%2 !== 0) html += '</div>';
+					});
+					html += '</div>';
+				});
+				this.html(html);
+			}
+		})(jQuery, BBall);
+
+		function runSimulation(n, outcomeCallback) {
+			for(var i = 0; i < n; i++) {
+				outcomeCallback(bracket.getOutcome());
+			}
+		}
+
+		function simulateChampions(winners, out) {
+			if(winners[out.winner.name]) return winners[out.winner.name].times++;
+			winners[out.winner.name] = { times: 1, team: out.winner };
+		}
+
+		function simulateFinalFours(winners, out) {
+			var left = out.childA,
+				right = out.childB,
+				finalFour = [ left.childA.winner, left.childB.winner, right.childA.winner, right.childB.winner ];
+			
+			_.each(finalFour, function(winner) {
+				if(winners[winner.name]) return winners[winner.name].times++;
+				winners[winner.name] = { times: 1, team: winner };
+			});
+		}
+
+		function simulateTopEight(winners, out) {
+			var left = out.childA,
+				right = out.childB,
+				leftLeft = left.childA,
+				leftRight = left.childB,
+				rightLeft = right.childA,
+				rightRight = right.childB,
+				topEight = [
+					leftLeft.childA.winner, leftLeft.childB.winner,
+					leftRight.childA.winner, leftRight.childB.winner,
+					rightLeft.childA.winner, rightLeft.childB.winner,
+					rightRight.childA.winner, rightRight.childB.winner
+				];
+			
+			_.each(topEight, function(winner) {
+				if(winners[winner.name]) return winners[winner.name].times++;
+				winners[winner.name] = { times: 1, team: winner };
+			});
+		}
+
+		function simulateUpsets(upsets, out) {
+			function traverseOutcomes(root) {
+				var winnerA, winnerB;
+				if(root.childA) winnerA = traverseOutcomes(root.childA);
+				if(root.childB) winnerB = traverseOutcomes(root.childB);
+				if(!winnerA || !winnerB) return root.winner;
+
+				if(root.winner.name === winnerA.name && winnerA.seed > 8 && winnerA.seed - winnerB.seed >= 4) {
+					if(upsets[winnerB.name]) upsets[winnerB.name].times++;
+					else upsets[winnerB.name] = { times: 1, team: winnerB };
+				}
+				else if(root.winner.name == winnerB.name && winnerB.seed > 8 && winnerB.seed - winnerA.seed >= 4) {
+					if(upsets[winnerA.name]) upsets[winnerA.name].times++;
+					else upsets[winnerA.name] = { times: 1, team: winnerA };
+				}
+
+				return root.winner;
+			}
+			
+			traverseOutcomes(out);
+		}
+
+		function simulateUpsetsBy(upsets, out) {
+			function traverseOutcomes(root) {
+				var winnerA, winnerB;
+				if(root.childA) winnerA = traverseOutcomes(root.childA);
+				if(root.childB) winnerB = traverseOutcomes(root.childB);
+				if(!winnerA || !winnerB) return root.winner;
+
+				if(root.winner.name === winnerA.name && winnerA.seed > 8 && winnerA.seed - winnerB.seed >= 4) {
+					if(upsets[winnerA.name]) upsets[winnerA.name].times++;
+					else upsets[winnerA.name] = { times: 1, team: winnerA };
+				}
+				else if(root.winner.name == winnerB.name && winnerB.seed > 8 && winnerB.seed - winnerA.seed >= 4) {
+					if(upsets[winnerB.name]) upsets[winnerB.name].times++;
+					else upsets[winnerB.name] = { times: 1, team: winnerB };
+				}
+
+				return root.winner;
+			}
+			
+			traverseOutcomes(out);
+		}
+
+		function outputBarForTeams($chart, teams, n) {
+			var data = [],
+				ticks = [];
+
+			_.each(teams, function(teamTimes, i) {
+				data.push([ teamTimes.times / n, i*5 ]);
+				ticks.push([ i*5, teamTimes.team.toString() ]);
+			}),
+
+			$.plot($chart,
+				[ { data: data,
+					bars: { show: true, barWidth: 2.0, align: 'center', horizontal: true } 
+				} ],
+				{
+					yaxis: { ticks: ticks },
+					xaxis: { tickFormatter: function(val) { return Math.round(val*100) + '%'; } }
+				}
+			);
+		}
+	</script>
+	<style type="text/css">
+		body {
+			font: 14px 'Droid Sans', sans-serif;
+		}
+		h1 {
+			margin-top: 10px;
+			margin-bottom: 10px;
+			text-align: center;
+		}
+		.sharing {
+			margin: 0px auto;
+			text-align: center;
+		}
+		.controls {
+			margin-top: 4px;
+			margin-bottom: 10px;
+			text-align: center;
+		}
+		.bracket-wrapper{
+			display: table;
+		}
+		.bracket {
+			margin-right: 2px;
+			float: left;
+			display: table-row;
+			white-space: nowrap;
+		}
+		.round {
+			margin-right: 4px;
+			float: left;
+			margin-top: auto;
+		}
+		.matchup {
+			position: relative;
+			padding-right: 2px;
+			border-right: 1px solid #333;
+			background-color: #eee;
+		}
+		.team {
+			border: 1px solid #555;
+			background-color: #ccc;
+			font-size: 12px;
+			height: 20px;
+			line-height: 22px;
+			width: 200px;
+			padding: 0 6px;
+			margin: 0 0 2px;
+			position: relative;
+			font-weight: bold;
+			white-space: normal;
+			text-overflow: ellipsis;
+			overflow: hidden;
+		}
+		.team.south {
+			background-color: #da7f7f;
+		}
+		.team.west {
+			background-color: #ac7fda;
+		}
+		.team.east {
+			background-color: #7fdada;
+		}
+		.team.midwest {
+			background-color: #acda7f;
+		}
+		.clear {
+			clear: both;
+			line-height: 0px;
+			height: 0;
+			overflow: hidden;
+		}
+		
+		.first .matchup {
+			margin-bottom: 4px;
+		}
+		.first .matchup:last-child {
+			margin-bottom: 0px;
+		}
+
+		.round.second {
+			margin-top: 12px;
+		}
+		.second .matchup {
+			margin-bottom: 28px;
+		}
+		.second .matchup > .team:first-child {
+			margin-bottom: 28px;
+		}
+		.second .matchup:last-child {
+			margin-bottom: 0px;
+		}
+
+		.round.third {
+			margin-top: 37px;
+		}
+		.third .team {
+			margin-bottom: 78px;
+		}
+		.third .matchup:last-child > .team:last-child {
+			margin-bottom: 0px;
+		}
+
+		.round.fourth {
+			margin-top: 88px;
+		}
+		.fourth .team {
+			margin-bottom: 178px;
+		}
+		.fourth .matchup:last-child > .team:last-child {
+			margin-bottom: 0px;
+		}
+
+		.round.fifth {
+			margin-top: 186px;
+		}
+		.fifth .team {
+			margin-bottom: 380px;
+		}
+		.fifth .matchup:last-child > .team:last-child {
+			margin-bottom: 0px;
+		}
+		
+		.round.sixth {
+			margin-top: 388px;
+		}
+		.sixth .team {
+			margin-bottom: 780px;
+		}
+		.sixth .matchup:last-child > .team:last-child {
+			margin-bottom: 0px;
+		}
+
+		.round.seventh {
+			margin-top: 778px;
+			padding: 10px;
+		}
+		.seventh .matchup {
+			padding: 0px;
+			border-right: none;
+		}
+		.seventh .team {
+			font-size: 20px;
+			font-weight: bold;
+			height: 40px;
+			line-height: 42px;
+		}
+
+		#charts {
+			text-align: center;
+			margin: 4px auto;
+		}
+		.chart-wrapper {
+			border: 1px solid #999;
+			margin: 10px auto;
+			width: 1040px;
+			display: block;
+		}
+		.chart {
+			width: 1000px;
+			height: 720px;
+		}
+		.chart-wrapper h2 {
+			text-align: center;
+			margin: 2px;
+			font-size: 16px;
+		}
+		#chart-progress {
+			margin: 4px auto;
+			display: block;
+			font-weight: bold;
+		}
+
+		.button
+		{
+			margin: 10px;
+			text-decoration: none;
+			font-weight: bold;
+			font-size: 16px;
+			display: inline-block;
+			text-align: center;
+			color: #fff;
+			border: 1px solid #9c9c9c;
+			border: 1px solid rgba(0, 0, 0, 0.3);
+			text-shadow: 0 1px 0 rgba(0,0,0,0.4);
+			box-shadow: 0 0 .05em rgba(0,0,0,0.4);
+			-moz-box-shadow: 0 0 .05em rgba(0,0,0,0.4);
+			-webkit-box-shadow: 0 0 .05em rgba(0,0,0,0.4);
+		}
+		.button, .button span
+		{
+			-moz-border-radius: .3em;
+			border-radius: .3em;
+		}
+		.button span
+		{
+			border-top: 1px solid #fff; /* Fallback style */
+			border-top: 1px solid rgba(255, 255, 255, 0.5);
+			display: block;
+			padding: 0.5em 2.5em;
+		}
+		.button:hover
+		{
+			box-shadow: 0 0 .1em rgba(0,0,0,0.4);
+			-moz-box-shadow: 0 0 .1em rgba(0,0,0,0.4);
+			-webkit-box-shadow: 0 0 .1em rgba(0,0,0,0.4);
+		}
+		.button:active
+		{
+			position: relative;
+			top: 1px;
+		}
+
+		.button-blue
+		{
+			background: #4477a1;
+			background: -webkit-gradient(linear, left top, left bottom, from(#81a8cb), to(#4477a1) );
+			background: -moz-linear-gradient(-90deg, #81a8cb, #4477a1);
+			filter:  progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr='#81a8cb', endColorstr='#4477a1');
+		}
+		.button-blue:hover
+		{
+			background: #81a8cb;
+			background: -webkit-gradient(linear, left top, left bottom, from(#4477a1), to(#81a8cb) );
+			background: -moz-linear-gradient(-90deg, #4477a1, #81a8cb);
+			filter:  progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr='#4477a1', endColorstr='#81a8cb');
+		}
+		.button-blue:active
+		{
+			background: #4477a1;
+		}
+	</style>
+</head>
+<body>
+<textarea id="teams-json" style="display: none">
+{
+	"east": [
+		{ "name": "Syracuse", "sagarin": 91.32, "seed": 1 },
+		{ "name": "Ohio State", "sagarin": 94.91, "seed": 2 },
+		{ "name": "Florida State", "sagarin": 86.17, "seed": 3 },
+		{ "name": "Wisconsin", "sagarin": 90.86, "seed": 4 },
+		{ "name": "Vanderbilt", "sagarin": 86.45, "seed": 5 },
+		{ "name": "Cincinatti", "sagarin": 83.69, "seed": 6 },
+		{ "name": "Gonzaga", "sagarin": 84.48, "seed": 7 },
+		{ "name": "Kansas State", "sagarin": 86.08, "seed": 8 },
+		{ "name": "Southern Miss", "sagarin": 80.44, "seed": 9 },
+		{ "name": "West Virginia", "sagarin": 83.69, "seed": 10 },
+		{ "name": "Texas", "sagarin": 85.61, "seed": 11 },
+		{ "name": "Harvard", "sagarin": 82.34, "seed": 12 },
+		{ "name": "Montana", "sagarin": 78.11, "seed": 13 },
+		{ "name": "St. Bonaventure", "sagarin": 80.87, "seed": 14 },
+		{ "name": "Loyola (MD)", "sagarin": 74.84, "seed": 15 },
+		{ "name": "UNC-Asheville", "sagarin": 76.03, "seed": 16 }
+	],
+	"midwest": [
+		{ "name": "UNC", "sagarin": 91.85, "seed": 1 },
+		{ "name": "Kansas", "sagarin": 92.45, "seed": 2 },
+		{ "name": "Georgetown", "sagarin": 88.11, "seed": 3 },
+		{ "name": "Michigan", "sagarin": 85.13, "seed": 4 },
+		{ "name": "Temple", "sagarin": 83.52, "seed": 5 },
+		{ "name": "San Diego State", "sagarin": 81.39, "seed": 6 },
+		{ "name": "Saint Mary's", "sagarin": 83.38, "seed": 7 },
+		{ "name": "Creighton", "sagarin": 84.77, "seed": 8 },
+		{ "name": "Alabama", "sagarin": 85.26, "seed": 9 },
+		{ "name": "Purdue", "sagarin": 85.14, "seed": 10 },
+		{ "name": "North Carolina State", "sagarin": 82.63, "seed": 11 },
+		{ "name": "California", "sagarin": 85.44, "seed": 12 },
+		{ "name": "South Florida", "sagarin": 79.94, "seed": 12 },
+		{ "name": "Ohio", "sagarin": 79.86, "seed": 13 },
+		{ "name": "Belmont", "sagarin": 85.6, "seed": 14 },
+		{ "name": "Detroit", "sagarin": 75.84, "seed": 15 },
+		{ "name": "Lamar", "sagarin": 77.16, "seed": 16 },
+		{ "name": "Vermont", "sagarin": 74.84, "seed": 16 }
+	],
+	"south": [
+		{ "name": "Kentucky", "sagarin": 94.35, "seed": 1 },
+		{ "name": "Duke", "sagarin": 88.27, "seed": 2 },
+		{ "name": "Baylor", "sagarin": 87.99, "seed": 3 },
+		{ "name": "Indiana", "sagarin": 89.55, "seed": 4 },
+		{ "name": "Wichita State", "sagarin": 89.47, "seed": 5 },
+		{ "name": "UNLV", "sagarin": 85.25, "seed": 6 },
+		{ "name": "Notre Dame", "sagarin": 82.38, "seed": 7 },
+		{ "name": "Iowa State", "sagarin": 84.35, "seed": 8 },
+		{ "name": "Connecticut", "sagarin": 83.75, "seed": 9 },
+		{ "name": "Xavier", "sagarin": 81.13, "seed": 10 },
+		{ "name": "Colorado", "sagarin": 79.26, "seed": 11 },
+		{ "name": "VCU", "sagarin": 81.34, "seed": 12 },
+		{ "name": "New Mexico State", "sagarin": 80.89, "seed": 13 },
+		{ "name": "South Dakota State", "sagarin": 80.93, "seed": 14 },
+		{ "name": "Lehigh", "sagarin": 78.6, "seed": 15 },
+		{ "name": "Western Kentucky", "sagarin": 70.04, "seed": 16 }
+	],
+	"west": [
+		{ "name": "Michigan State", "sagarin": 93.12, "seed": 1 },
+		{ "name": "Missouri", "sagarin": 90.9, "seed": 2 },
+		{ "name": "Marquette", "sagarin": 87.5, "seed": 3 },
+		{ "name": "Louisville", "sagarin": 86.5, "seed": 4 },
+		{ "name": "New Mexico", "sagarin": 87.37, "seed": 5 },
+		{ "name": "Murray State", "sagarin": 82.01, "seed": 6 },
+		{ "name": "Florida", "sagarin": 87.7, "seed": 7 },
+		{ "name": "Memphis", "sagarin": 88.74, "seed": 8 },
+		{ "name": "St. Louis", "sagarin": 87.33, "seed": 9 },
+		{ "name": "Virginia", "sagarin": 85.4, "seed": 10 },
+		{ "name": "Colorado State", "sagarin": 79.31, "seed": 11 },
+		{ "name": "Long Beach State", "sagarin": 83, "seed": 12 },
+		{ "name": "Davidson", "sagarin": 80.35, "seed": 13 },
+		{ "name": "BYU", "sagarin": 83.23, "seed": 14 },
+		{ "name": "Norfolk State", "sagarin": 70.52, "seed": 15 },
+		{ "name": "Long Island", "sagarin": 72.75, "seed": 16 }
+	]
+}
+</textarea>
+<h1 id="top">Bascodeball - Realistic Randomized NCAA Tournament Bracket Generator</h1>
+<div id="sharing" class="sharing">
+	<span class='st_facebook_hcount' displayText='Facebook'></span>
+	<span class='st_twitter_hcount' displayText='Tweet'></span>
+	<span class='st_plusone_hcount' displayText='Google +1'></span>
+</div>
+<div id="controls" class="controls">
+	<a href="#" id="gen-new-bracket" class="button button-blue"><span>Generate New Bracket</span></a>
+	<a href="#graph"><span>Go To Graphs</span></a>
+</div>
+<div class="bracket-wrapper">
+<div id="bracket" class="bracket">
+</div>
+</div>
+<div class="clear"></div>
+<div id="charts">
+	<h1 id="graph">Graphs - Simulate a bracket 100,000 times</h1>
+	<a href="#" id="gen-charts" class="button button-blue"><span>Simulate</span></a>
+	<div id="chart-progress" style="display:none;"></div>
+	<div class="chart-wrapper">
+		<h2>% Times As Champion</h2>
+		<div id="champ-chart" class="chart"></div>
+	</div>
+	<div class="chart-wrapper">
+		<h2>% Times in Final Four</h2>
+		<div id="finalfour-chart" class="chart"></div>
+	</div>
+	<div class="chart-wrapper">
+		<h2>% Times in Top Eight</h2>
+		<div id="topeight-chart" class="chart"></div>
+	</div>
+	<div class="chart-wrapper">
+		<h2>% Times Was Upset (Seed > 8 Beats Better Seed, Min Delta 4)</h2>
+		<div id="upset-chart" class="chart"></div>
+	</div>
+	<div class="chart-wrapper">
+		<h2>% Times Caused Upset (Seed > 8 Beats Better Seed, Min Delta 4)</h2>
+		<div id="upsetby-chart" class="chart"></div>
+	</div>
+</div>
+</body>
+</html>
