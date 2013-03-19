@@ -1,6 +1,5 @@
 /*global $:true, jQuery:true, _:true */
-
-window.__module = {};
+var __module = {};
 (function(module) {
   "use strict";
 
@@ -18,7 +17,7 @@ window.__module = {};
       underdog = seedA;
     }
 
-    var pFavored = Math.min((-0.0355 * (favorite - underdog)) + 0.5, 0.99);
+    var pFavored = Math.min((-0.0316048 * (favorite - underdog)) + 0.5053254, 0.99);
     if(favorite == seedA) return pFavored;
     else return 1 - pFavored;
   }
@@ -185,12 +184,11 @@ window.__module = {};
       regionBrackets[regionName] = buildBracketForTeams(teams);
     });
 
-    var southWestMatch = new Matchup(regionBrackets.south, regionBrackets.west);
-    var eastMidwestMatch = new Matchup(regionBrackets.east, regionBrackets.midwest);
-    var finals = new Matchup(southWestMatch, eastMidwestMatch);
+    var midwestWestMatch = new Matchup(regionBrackets.midwest, regionBrackets.west);
+    var southEastMatch = new Matchup(regionBrackets.south, regionBrackets.east);
+    var finals = new Matchup(midwestWestMatch, southEastMatch);
     return finals;
   }
 })(__module);
-var BBall = __module.exports;
-delete window.__module;
 
+window.BBall = __module.exports;

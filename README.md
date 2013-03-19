@@ -6,7 +6,7 @@ bascodeball
 Usage
 -----
 
-This project can be used out of the box by simply opening the HTML file in your browser. The data in the file applies to the 2012 tournament, but is an easily changeable JSON format. The provided XLSM file can be used to generate updated statistics and JSON for use with the script.
+This project can be used out of the box by simply opening the HTML file in your browser. The data in the file applies to the 2012 tournament, but is an easily changeable JSON format. The formula for seed matchups is generated using a Google Drive spreadsheet, available [here](https://docs.google.com/spreadsheet/ccc?key=0ApBEYUkFT9bbdHBPbFZGRFQtMEEzVm0yOFZLems3U2c&usp=sharing).
 
 Features
 --------
