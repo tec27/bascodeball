@@ -1,0 +1,19 @@
+{
+  "name": "bascodeball-updater",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Travis Collins <travis@tec27.com> (http://tec27.com/)",
+  "license": "MIT",
+  "dependencies": {
+    "babel": "^4.7.8",
+    "co": "^4.4.0",
+    "concat-stream": "^1.4.7",
+    "jsdom": "^4.0.2",
+    "regression": "^1.2.0",
+    "request": "^2.53.0"
+  }
+}
