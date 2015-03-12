@@ -1,10 +1,11 @@
 {
-  "name": "bascodeball-updater",
+  "name": "bascodeball",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "updater": "node ./updater/"
   },
   "author": "Travis Collins <travis@tec27.com> (http://tec27.com/)",
   "license": "MIT",
