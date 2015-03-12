@@ -4,10 +4,11 @@
 
 ##Usage
 
-This project can be used out of the box by simply opening the HTML file in your browser. This file can be rebuilt (and regenerated for different years) by running the updater script:
+This project can be used out of the box by simply opening the HTML file in your browser. This file can be rebuilt (and regenerated for different years) by running the updater script and rebuild step:
 
 ```
 npm run updater
+npm run rebuild
 ```
 
 ##Features

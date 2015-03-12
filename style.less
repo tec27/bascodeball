@@ -1,0 +1,19 @@
+@import "node_modules/material-ui/src/less/scaffolding.less";
+
+@primary-1-color: @deep-purple-500;
+@primary-2-color: @deep-purple-100;
+@primary-3-color: @deep-purple-700;
+@accent-1-color: @cyan-A200;
+@accent-2-color: @cyan-A100;
+@accent-3-color: @cyan-A400;
+
+// the whites have the wrong opacity, so we fix that
+@dark-white: rgba(255, 255, 255, 0.7);
+@light-white: rgba(255, 255, 255, 0.3);
+@faint-white: rgba(255, 255, 255, 0.12);
+
+// spec says white text should be 100% opacity, for some reason material-ui picks 87% (I guess
+// confusion with the black color palette). Fix this for the places where we use white text
+@app-bar-text-color: @full-white;
+
+@import "node_modules/material-ui/src/less/components.less";

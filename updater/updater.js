@@ -70,7 +70,6 @@ co(function*() {
   let { equation } = regression('linear', bySeedDifferential)
   return { slope: equation[0], intercept: equation[1] }
 }).then(equation => {
-  console.log('done!')
   console.dir(equation)
 }, err => {
   console.error(err.stack)

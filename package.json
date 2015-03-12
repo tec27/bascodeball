@@ -4,17 +4,41 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "rebuild": "browserify main.jsx -o bundle.js && lessc style.less > style.css",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "updater": "node ./updater/"
+    "updater": "node ./updater/ > historical.json",
+    "watch": "watchify main.jsx -o bundle.js"
   },
   "author": "Travis Collins <travis@tec27.com> (http://tec27.com/)",
   "license": "MIT",
+  "repository": "https://github.com/tec27/bascodeball",
   "dependencies": {
     "babel": "^4.7.8",
+    "babelify": "^5.0.4",
+    "browserify": "^9.0.3",
     "co": "^4.4.0",
     "concat-stream": "^1.4.7",
     "jsdom": "^4.0.2",
+    "less": "^2.4.0",
+    "material-ui": "^0.7.1",
+    "react": "^0.12.2",
+    "react-router": "^0.12.4",
+    "react-tap-event-plugin": "^0.1.4",
+    "reactify": "^1.0.0",
     "regression": "^1.2.0",
     "request": "^2.53.0"
+  },
+  "devDependencies": {
+    "watchify": "^2.4.0"
+  },
+  "browserify": {
+    "transform": [
+      [
+        "babelify",
+        {
+          "loose": "all"
+        }
+      ]
+    ]
   }
 }
